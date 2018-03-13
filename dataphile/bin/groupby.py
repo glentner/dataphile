@@ -118,7 +118,7 @@ def main() -> int:
             # read off in whole line increments
             for data in source.readlines(buffer_size):
                 # create data frame and append to files grouped by specified field
-                frame = read_csv(BytesIO(data), names=names, sep=opt.delimiter)
+                frame = read_csv(BytesIO(data), header=None, names=names, sep=opt.delimiter)
                 for group_name, group_data in frame.groupby(key):
                     if len(group_data) < 1: continue
                     filename = path_fmt(key=group_name.replace('/', opt.slash).replace(':', opt.colon))
