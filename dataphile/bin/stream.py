@@ -27,7 +27,7 @@ import argparse
 import platform
 
 if platform.system() == 'Windows':
-    # TODO: how do we ignore broken pipes on windows?
+    # FIXME: how do we ignore broken pipes on windows?
     pass
 else:
     from signal import signal, SIGPIPE, SIG_DFL  # ignore broken pipes
