@@ -61,6 +61,9 @@ def main() -> int:
         opt = parser.parse_args()
         buffer_size = int(opt.buffersize * 1024**2)
         read = 'read_live' if opt.live_connection else 'read'
+        if not opt.source and not opt.watch_for_files:
+            # accept input sources from pipe directly
+            opt.source = [path.strip() for path in sys.stdin.readlines()]
         if opt.use_progress_bar is True:
             total_bytes = None if not opt.source else sum(os.path.getsize(f) for f in opt.source)
             with Stream(*opt.source, live=opt.live_connection, watch=opt.watch_for_files) as source:
