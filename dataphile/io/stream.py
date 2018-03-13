@@ -26,7 +26,6 @@ import os
 import re
 import sys
 import time
-import signal
 from typing import Any, Union, List, Dict, Tuple, IO, Callable, Generator, Iterator
 
 # internal libs
