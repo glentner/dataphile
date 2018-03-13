@@ -24,9 +24,13 @@
 import os
 import sys
 import argparse
+import platform
 
-from signal import signal, SIGPIPE, SIG_DFL  # ignore broken pipes
-signal(SIGPIPE, SIG_DFL)
+if platform.system() == 'Windows':
+    # TODO: how do we ignore broken pipes on windows?
+else:
+    from signal import signal, SIGPIPE, SIG_DFL  # ignore broken pipes
+    signal(SIGPIPE, SIG_DFL)
 
 # external libs
 from tqdm import tqdm as monitor
