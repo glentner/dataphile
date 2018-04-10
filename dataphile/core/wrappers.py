@@ -21,29 +21,31 @@
 """
 
 
-# standard libs
-import signal
-
+# Windows doesn't work with 'signal' package, so implement using multiprocessing
+from multiprocessing import Process, Queue
 
 def timeout(seconds, action=None):
     """Calls any function with timeout after 'seconds'.
        If a timeout occurs, 'action' will be returned or called if
        it is a function-like object.
     """
-    def handler(signum, stack_frame):
-        raise TimeoutError(signum, stack_frame)
+    def handler(queue, function, args, kwargs):
+        queue.put(function(*args, **kwargs))
     def decorator(function):
         def wraps(*args, **kwargs):
-            signal.signal(signal.SIGALRM, handler)
-            signal.alarm(seconds)
-            try:
-                return function(*args, **kwargs)
-            except TimeoutError:
-                if action is None:
-                    return None
-                elif hasattr(action, '__call__'):
+            q = Queue()
+            p = Process(target=handler, args=(q, function, args, kwargs))
+            p.start()
+            p.join(timeout=seconds)
+            if p.is_alive():
+                p.terminate()
+                p.join()
+                if hasattr(action, '__call__'):
                     return action()
                 else:
                     return action
+            else:
+                return q.get()
         return wraps
     return decorator
+
