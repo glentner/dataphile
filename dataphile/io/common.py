@@ -42,6 +42,9 @@ compression_formats = {
         'pattern': '(?i)\.(xz|lzma)$',
         'reader': lzma.open},
 }
+# aliases
+compression_formats['lzma'] = compression_formats['xz']
+compression_formats['bzip'] = compression_formats['bz2']
 
 
 archive_formats = {
