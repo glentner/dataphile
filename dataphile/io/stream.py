@@ -4,7 +4,7 @@
 # Copyright (c) 2018 Geoffrey Lentner <glentner@gmail.com>
 #
 # DataPhile is free software; you can redistribute it  and/or modify it under the terms of the GNU
-# General Public License (v3.0)as  published by the Free Software Foundation,  either version 3 of
+# General Public License (v3.0) as  published by the Free Software Foundation,  either version 3 of
 # the License, or (at your option) any  later version. WARRANTY; without even the implied warranty
 # of MERCHANTABILITY  or FITNESS  FOR A  PARTICULAR PURPOSE.  See the  GNU General  Public License
 # (v3.0) for more details.
@@ -15,7 +15,7 @@
 """Stream data from files.
    dataphile.io.stream
 
-   DataPhile, 0.0.1
+   DataPhile, 0.0.2
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
