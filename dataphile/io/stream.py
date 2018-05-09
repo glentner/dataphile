@@ -33,6 +33,7 @@ from .common import select_reader, FileTypes
 from ..core.logging import log
 from ..core.wrappers import timeout
 
+
 class Stream:
     """File I/O manager."""
 
@@ -98,14 +99,14 @@ class Stream:
         if not isinstance(value, dict) or not all(isinstance(key, str) for key in value.keys()):
             raise ValueError('`Stream.options` must be type Dict[str,Any].')
         else:
-            self.__options = value
+            self.__options = value.copy()
 
     @property
     def files(self) -> List[IO]:
         return list(self.__files.values())
 
     @files.setter
-    def files(self, name_or_buffers: List[Union[str,IO]]) -> None:
+    def files(self, name_or_buffers: List[Union[str, IO]]) -> None:
         """Assign/open file objects."""
         __files = dict()  # Dict[str,IO]
         for i, item in enumerate(name_or_buffers):
@@ -118,7 +119,7 @@ class Stream:
                                  '`io.TextIOWrapper` or `io.BufferedReader` accepted. '
                                  'Received {}').format(i+1, type(item)))
 
-        # make assignment only after successul construction
+        # make assignment only after successful construction
         self.__files = __files
 
     def __enter__(self):
@@ -149,39 +150,38 @@ class Stream:
         try:
             self.__files[name].close()
         except ValueError as err:
-            pass  # std{out,in} dont close
+            pass  # std{out,in} don't close
 
     def __iter__(self) -> Iterator[Union[str, bytes]]:
         """Iterate over all files (as if from a single file)."""
         yield from self.readlines()
-    def read(self, buffersize: int=1024) -> Generator[Union[str,bytes], None, None]:
+
+    def read(self, buffersize: int=1024) -> Generator[Union[str, bytes], None, None]:
         """Read all data from each open file."""
         for fp in self.files:
-            while True:
+            data = True
+            while data:
                 data = fp.read(buffersize)
                 yield data
-                if not data:
-                    break
 
     def readlines(self, buffersize: int=1024) -> Generator[Union[str,bytes], None, None]:
         """Read all data from each open file in whole line increments."""
         for fp in self.files:
-            while True:
+            data = True
+            while data:
                 data = fp.read(buffersize) + fp.readline()
                 yield data
-                if not data:
-                    break
 
-    def read_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str,bytes], None, None]:
+    def read_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str, bytes], None, None]:
         """Yield back chunks of data of size 'buffersize' and await new data.
 
            Parameters
            ----------
            buffersize: int (default=1024)
                Number of bytes to read at a time.
+
            latency: float (default=0.1)
                Number of seconds to wait before attempting to read data again.
-               Only relavent when live==True.
 
            Yields
            ------
@@ -197,7 +197,7 @@ class Stream:
         except KeyboardInterrupt:
             pass
 
-    def readlines_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str,bytes], None, None]:
+    def readlines_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str, bytes], None, None]:
         """Yield back chunks of data of size 'buffersize' in whole line increments and await new data.
 
            Parameters
@@ -233,6 +233,7 @@ class Stream:
     def __check_new_file(self) -> None:
         """Check for new files from <stdin>. A timeout of 1-sec prevents blocking."""
         return sys.stdin.readline().strip()
+
     def __update_files(self) -> None:
         """Remove non-existent files and check <stdin> for file paths."""
         # continue to read file paths off <stdin> until None is returned (after 1-sec delay)

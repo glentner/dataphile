@@ -157,6 +157,7 @@ class Handler:
         else:
             self.write_to_console(msg, file=file, **options)
 
+
 class LoggerBase:
     """Mixin class to implement logging functionality.
 
@@ -168,7 +169,7 @@ class LoggerBase:
     __loglevels__ = {'DEBUG': 1, 'INFO': 2, 'WARNING': 3, 'CRITICAL': 4, 'ERROR': 5}
 
     __level = __defaultlevel__
-    handlers = list()
+    # handlers = list()  # this creates duplicate handlers!
 
     def log(self, msg: str, level: str='INFO', **options) -> None:
         """Write `msg` to all :`handlers`."""
@@ -208,8 +209,9 @@ class LoggerBase:
         """Add a 'handler' (of type `Handler`) to the list of used handlers."""
         if not isinstance(handler, Handler):
             raise TypeError('Logger.add_handler requires `Handler` type.')
-        else:
-            self.handlers.append(handler)
+        if not hasattr(self, 'handlers'):
+            self.handlers = list()
+        self.handlers.append(handler)
 
     @property
     def level(self) -> str:
@@ -241,6 +243,7 @@ class LoggerBase:
         for filepath in self.files:
             with open(filepath, mode='a') as file_handle:
                 yield file_handle
+
 
 class DefaultLogger(LoggerBase):
     """Dedicated Logging object."""
@@ -287,7 +290,6 @@ class DefaultLogger(LoggerBase):
                                      command    = root,
                                      time       = datetime.now,
                                      level      = lambda: self.handlers[0].current_call_loglevel))
-
 
 
 # shared instance across whole package

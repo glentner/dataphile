@@ -54,6 +54,7 @@ parser.add_argument('-l', '--live', help='maintain connection and wait for new d
 parser.add_argument('-w', '--watch', help='accept new file locations in realtime',
                     action='store_true', dest='watch_for_files')
 
+
 def main() -> int:
     """Entry point for 'stream' command."""
 
@@ -79,4 +80,4 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
 
-    sys.exit(0)
+    return 0

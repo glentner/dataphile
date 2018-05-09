@@ -24,17 +24,20 @@
 # Windows doesn't work with 'signal' package, so implement using multiprocessing
 from multiprocessing import Process, Queue
 
+
 def timeout(seconds, action=None):
     """Calls any function with timeout after 'seconds'.
        If a timeout occurs, 'action' will be returned or called if
        it is a function-like object.
     """
-    def handler(queue, function, args, kwargs):
-        queue.put(function(*args, **kwargs))
-    def decorator(function):
+    def handler(queue, func, args, kwargs):
+        queue.put(func(*args, **kwargs))
+
+    def decorator(func):
+
         def wraps(*args, **kwargs):
             q = Queue()
-            p = Process(target=handler, args=(q, function, args, kwargs))
+            p = Process(target=handler, args=(q, func, args, kwargs))
             p.start()
             p.join(timeout=seconds)
             if p.is_alive():
@@ -46,6 +49,8 @@ def timeout(seconds, action=None):
                     return action
             else:
                 return q.get()
+
         return wraps
+
     return decorator
 
