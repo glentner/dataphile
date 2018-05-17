@@ -123,7 +123,7 @@ class SyntheticDataset(Dataset):
     @samples.setter
     def samples(self, value: int) -> None:
         """Set the number of samples to take from the distribution."""
-        if isinstance(value: int):
+        if isinstance(value, int):
             self.__samples = value
         else:
             raise ValueError('SyntheticDataset.samples must be an integer value.')

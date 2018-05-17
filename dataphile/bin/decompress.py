@@ -49,7 +49,7 @@ def check_compression_option(opt: argparse.Namespace):
     else:
         reader = compression_formats[default]['reader']
         if not opt.source:
-            handles =
+            raise NotImplementedError('decompress is not finished')
 
 
 def main() -> int:
