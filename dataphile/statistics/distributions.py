@@ -70,7 +70,7 @@ def gaussianND(X: np.ndarray,
     return amplitude * np.exp(-0.5 * ((X - center)**2 / stdev**2).sum(axis=1))
 
 
-def blackbody(x: np.ndarray, T: Quantity)
+def blackbody(x: np.ndarray, T: Quantity) -> Quantity:
     """Planck's law of black-body radiation
 
        The spectral radiance (the power per unit solid angle and per unit of area normal to the propagation)
