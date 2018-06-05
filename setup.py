@@ -46,6 +46,9 @@ TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=
                               # TODO: 'unique':  '.bin.unique',
                               # TODO: 'add':     '.bin.add',
                               # TODO: 'mean':    '.bin.mean',
+                              # TODO: 'select':  '.bin.select',
+                              # TODO: 'where':   '.bin.where',
+                              # TODO: 'dropna':  '.bin.dropna',
                               }.items()
 ]
 
