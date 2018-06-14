@@ -16,7 +16,7 @@
 """Setup and installation script for DataPhile project.
    setup.py
 
-   DataPhile, 0.0.1
+   DataPhile, 0.1.0
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
@@ -46,6 +46,9 @@ TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=
                               # TODO: 'unique':  '.bin.unique',
                               # TODO: 'add':     '.bin.add',
                               # TODO: 'mean':    '.bin.mean',
+                              # TODO: 'select':  '.bin.select',
+                              # TODO: 'where':   '.bin.where',
+                              # TODO: 'dropna':  '.bin.dropna',
                               }.items()
 ]
 

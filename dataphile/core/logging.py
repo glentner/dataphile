@@ -15,7 +15,7 @@
 """Dynamic/colorized logging facility for DataPhile project.
    dataphile.core.logging
 
-   DataPhile, 0.0.2
+   DataPhile, 0.1.0
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
@@ -245,52 +245,52 @@ class LoggerBase:
                 yield file_handle
 
 
-class DefaultLogger(LoggerBase):
+class Logger(LoggerBase):
     """Dedicated Logging object."""
 
-    __filetemplate__ = '[{level} {time} {command}] {msg}'
-    __consoletemplate__ = '{level} {msg}'
-
-    def __init__(self, loglevel: str='INFO', folder: str=None, files: List[str]=None, root: str='DataPhile',
-                 console: bool=True):
+    def __init__(self, loglevel: str='INFO', files: List[str]=None, folder: str=None, app: str='',
+                 console: bool=True, template: str='{level} {time} {app} {msg}'):
         """Initialize the handlers."""
 
         # default level
         self.level = loglevel
 
+        if platform.system() == 'Windows':
+            timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')  # Windows compatible filename
+        else:
+            timestamp = datetime.now().strftime('%Y%m%d-%H:%M:%S')
+
         # send log messages to stdout
         if console is True:
-            self.add_handler(Handler(template = self.__consoletemplate__,
-                                    level    = lambda: self.handlers[0].current_call_loglevel))
+            self.add_handler(Handler(template = template,
+                                     level    = lambda: self.handlers[0].current_call_loglevel,
+                                     time     = datetime.now,
+                                     app      = app))
 
-        # ensure folders exists
+        # file output
         if files:
             for path in files:
                 if not os.path.isdir(os.path.dirname(path)):
                     raise IOError('{} does not exist'.format(os.path.dirname(path)))
-        if folder is not None:
-            os.makedirs(folder, exist_ok=True)
+                else:
+                    self.add_handler(Handler(template   = template,
+                                            file       = path,
+                                            level      = lambda: self.handlers[0].current_call_loglevel,
+                                            time       = datetime.now,
+                                            app        = app))
 
-        # send log messages to file
-        if platform.system() == 'Windows':
-            timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')  # Windows compatible filename
-        else:
-            timestamp = datetime.now().strftime('%Y-%m%d0%H:%M:%S')
-
-        if files:
-            for path in files:
-                self.add_handler(Handler(template   = self.__filetemplate__,
-                                        file       = self.__location__.format(timestamp=timestamp),
-                                        command    = root,
-                                        time       = datetime.now,
-                                        level      = lambda: self.handlers[0].current_call_loglevel))
         if folder:
-            self.add_handler(Handler(template   = self.__filetemplate__,
-                                     file       = os.path.join(folder, timestamp + '.log'),
-                                     command    = root,
-                                     time       = datetime.now,
-                                     level      = lambda: self.handlers[0].current_call_loglevel))
+            if not os.path.isdir(os.path.dirname(folder)):
+                raise IOError('{} is not a directory'.format(os.path.dirname(folder)))
+            elif not os.path.isdir(folder):
+                os.makedirs(folder)
+            filename = '{}{}.log'.format(app + '-' if app else '', timestamp)
+            self.add_handler(Handler(template   = template,
+                                     file       = filename,
+                                     level      = lambda: self.handlers[0].current_call_loglevel,
+                                     app        = app,
+                                     time       = datetime.now))
 
 
 # shared instance across whole package
-log = DefaultLogger()
+log = Logger()

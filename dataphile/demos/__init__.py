@@ -12,8 +12,8 @@
 # You should have received a copy of the GNU General Public License (v3.0) along with this program.
 # If not, see <http://www.gnu.org/licenses/>.
 
-"""Common visualization configurations and tools.
-   dataphile.graphics.__init__
+"""Demonstrations for features provided by DataPhile.
+   dataphile.demos.__init__
 
    DataPhile, 0.1.0
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.

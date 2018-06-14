@@ -15,15 +15,17 @@
 """Statistical functions (e.g., polynomials, gaussians, etc.)
    dataphile.statistics.distributions
 
-   DataPhile, 0.0.2
+   DataPhile, 0.1.0
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
 
 from numbers import Number
+from typing import Union
 
 import numpy as np
 from astropy import units as u
+from astropy.units import Quantity
 
 
 def polynomial1D(x: np.ndarray, *p: Number) -> np.ndarray:
@@ -70,7 +72,7 @@ def gaussianND(X: np.ndarray,
     return amplitude * np.exp(-0.5 * ((X - center)**2 / stdev**2).sum(axis=1))
 
 
-def blackbody(x: np.ndarray, T: Quantity)
+def blackbody(x: np.ndarray, T: Quantity) -> Quantity:
     """Planck's law of black-body radiation
 
        The spectral radiance (the power per unit solid angle and per unit of area normal to the propagation)
@@ -86,7 +88,7 @@ def blackbody(x: np.ndarray, T: Quantity)
     # planck's, speed of light, and Boltzmann constants
     from astropy.constants import h, c, k_B
 
-    A = 2 * h * c**2 / wavelength**5
+    A = 2 * h * c**2 / x**5
     B = np.exp((h * c / (x * k_B * T)).decompose()) - 1
     return (A / B).to('kW m^-2 nm-1') / u.sr
 
@@ -101,4 +103,15 @@ def voigt1D(x: np.ndarray, *p: Number) -> np.ndarray:
     """A Voigt distribution is the convolution of a Gaussian and Lorentzian.
        See `normalized_voigt1D` for parameter descriptions.
     """
-    return p[0] * normalized_voigt(x, *p[1:]) / normalized_voigt(0, 0, *p[2:])
+    return p[0] * normalized_voigt1D(x, *p[1:]) / normalized_voigt1D(0, 0, *p[2:])
+
+
+def sinusoid1D(x: np.ndarray, A: float=1, freq: float=1, phase: float=0) -> np.ndarray:
+    """Sinusoidal wave. y = A * sin(freq*x - phase)
+
+       x: `numpy.ndarray`
+       A: float (default=1)
+       freq: float (default=1)
+       phase: float (default=0)
+    """
+    return A * np.sin(freq * x - phase)

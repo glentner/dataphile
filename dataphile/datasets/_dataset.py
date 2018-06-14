@@ -15,7 +15,7 @@
 """Base classes for dataset objects.
    dataphile.datasets._dataset
 
-   DataPhile, 0.0.2
+   DataPhile, 0.1.0
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
@@ -41,6 +41,7 @@ class SyntheticDataset(Dataset):
                  domain: Tuple[Number, Number],
                  samples: int,
                  linspace: bool=False,
+                 ordered: bool=False,
                  noise: float=0.05,
                  seed: Number=None):
         """Define the distribution."""
@@ -51,24 +52,20 @@ class SyntheticDataset(Dataset):
         self.domain = domain
         self.samples = samples
         self.linspace = linspace
+        self.ordered = ordered
         self.noise = noise
         self.seed = seed
 
 
-    def generate(self, parameters: List[Number], domain: Tuple[Number, Number], samples: int, linspace: bool=False,
-                 noise: float=0.05, seed: Number=None) -> Tuple[np.ndarray, np.ndarray]:
-        """Generate the dataset (overriding any of the parameters)."""
-
-        self.parameters = parameters
-        self.domain = domain
-        self.samples = samples
-        self.noise = noise
-        self.seed = seed
+    def generate(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Generate new synthetic data."""
 
         if self.linspace is True:
             xdata = np.linspace(*self.domain, self.samples)
         else:
             xdata = np.random.uniform(*self.domain, self.samples)
+            if self.ordered is True:
+                xdata.sort()
 
         ydata = self.distribution(xdata, *self.parameters)
         ydata += np.random.normal(0., self.noise * (ydata.max() - ydata.min()), self.samples)
@@ -123,7 +120,7 @@ class SyntheticDataset(Dataset):
     @samples.setter
     def samples(self, value: int) -> None:
         """Set the number of samples to take from the distribution."""
-        if isinstance(value: int):
+        if isinstance(value, int):
             self.__samples = value
         else:
             raise ValueError('SyntheticDataset.samples must be an integer value.')
@@ -147,10 +144,10 @@ class SyntheticDataset(Dataset):
         return self.__noise
 
     @noise.setter
-    def noise(self, value: float) -> None:
+    def noise(self, value: Number) -> None:
         """Set the signal to noise value."""
-        if isinstance(value, float) and 0 <= value and value <= 1:
-            self.__noise = value
+        if isinstance(value, Number) and 0 <= value and value <= 1:
+            self.__noise = float(value)
         else:
             raise ValueError('SyntheticDataset.noise must be a number between 0 and 1.')
 
