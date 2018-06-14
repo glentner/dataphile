@@ -21,3 +21,4 @@
 """
 
 
+from ._dataset import Dataset, SyntheticDataset
