@@ -25,6 +25,7 @@ from numbers import Number
 import itertools
 
 import numpy as np
+import pandas as pd
 from astropy.units import Quantity
 from scipy.optimize import curve_fit
 
@@ -308,13 +309,23 @@ class Model:
         """Evaluate the model against a new set of 'xdata'."""
         return self.solve(xdata)
 
+    def summary(self) -> pd.DataFrame:
+        """Return a summary table of current parameters."""
+        return pd.DataFrame({'parameter': [p.label for p in self.parameters],
+                             'value': self.values,
+                             'uncertainty': self.uncertainties,
+                             'model': [p.model.label for p in self.parameters]
+                             }).set_index(['model', 'parameter'])
+
 class CompositeModel(Model):
     """A model constructed of a superposition of two or more `Model`s."""
 
-    def __init__(self, *models: Model, label: str=None):
+    def __init__(self, *models: Model, label: str=None, optimizer: Callable=curve_fit):
         """Initialize the model."""
 
         self.models = models
+        self.label = label
+        self.optimizer = optimizer
         for model in models:
             model.parent = self # associate with parent
             try:
@@ -335,7 +346,7 @@ class CompositeModel(Model):
     @models.setter
     def models(self, val: Tuple[Model, ...]) -> None:
         """Set component models, respectively."""
-        if not hasattr(value, '__iter__') or not all(isinstance(v, Model) for v in val):
+        if not hasattr(val, '__iter__') or not all(isinstance(v, Model) for v in val):
             raise TypeError('{0}.models expects Tuple[Model, ...], given {1}'
                             .format(self.__class__.__name__, val))
         else:
@@ -388,7 +399,8 @@ class AutoGUI:
 
     def __init__(self, model: Model, graphs: List[mpl.lines.Line2D]=None, figure: mpl.figure.Figure=None,
                  bbox: List[float]=[0, 0, 1, 1], background: Union[bool,str]=None, border: bool=False,
-                 radio_options: Dict[str, Any]=None, slider_options: Dict[str, Any]=None):
+                 radio_options: Dict[str, Any]=None, slider_options: Dict[str, Any]=None,
+                 data: Tuple[np.ndarray, np.ndarray]=None):
         """Initialize elements of the GUI.
 
            Arguments
@@ -408,10 +420,15 @@ class AutoGUI:
                with the graphs, this defines where on the canvas to draw.
            border: bool (default=False)
                If True, this actually puts a rectangular border around the bbox region.
+           background: str (default=None)
+               Use a solid background color behind widgets (e.g., 'white').
            radio_options: Dict[str, Any] (default=None)
                Named parameters (a.k.a., "kwargs") passed to mpl.widgets.RadioButtons.
            slider_options: Dict[str, Any] (default=None)
                Named parameters (a.k.a., "kwargs") passed to mpl.widters.Slider.
+           data: Tuple[np.ndarray, np.ndarray] (default=None)
+               If provided with (xdata, ydata), create a 'Fit' button and optimize the provided
+               data with the current model parameter values as initial guess.
         """
 
         # initialize attributes
@@ -423,6 +440,7 @@ class AutoGUI:
         self.background = background
         self.radio_options = radio_options
         self.slider_options = slider_options
+        self.data = data
 
         # access modes
         self.__models_by_label = {model.label: model for model in self.models}
@@ -436,13 +454,14 @@ class AutoGUI:
         # a simple model doesn't require a selection widget (radio buttons)
         # the sliders will be created for the first (or only) model and if
         # needed a radio button selector will toggle through the slider sets
-        self.__sliders = list()
-        self.__create_sliders(self.active_model.label)
         if isinstance(self.model, CompositeModel):
             self.__create_radio()
+        self.__sliders = list()
+        self.__create_sliders(self.active_model.label)
 
         # TODO: Add action buttons (e.g., 'fit')
-        # self.__create_fit_button()
+        if self.data is not None:
+            self.__create_fit_button()
         # self.__create_undo_button()
         # ...
 
@@ -632,6 +651,22 @@ class AutoGUI:
         """Access to list of current available sliders."""
         return self.__sliders
 
+    @property
+    def data(self) -> Tuple[np.ndarray, np.ndarray]:
+        """The x and y data to optimize the model against."""
+        return self.__data
+
+    @data.setter
+    def data(self, val: Tuple[np.ndarray, np.ndarray]) -> None:
+        """Assign x and y data to optimize the model against."""
+        if val is None:
+            self.__data = None  # don't create a Fit button
+        elif not hasattr(val, '__iter__') or len(val) != 2 or not val[0].shape == val[1].shape:
+            raise ValueError('{0}.data expects Tuple[np.ndarray, np.ndarray] with equal lengths.'
+                             .format(self.__class__.__name__))
+        else:
+            self.__data = tuple(val)
+
     def __create_radio(self) -> None:
         """Build the radio widget."""
 
@@ -644,6 +679,10 @@ class AutoGUI:
 
         # formatting
         axis.patch.set_facecolor('none')
+        axis.patch.set_edgecolor('none')
+        for edge in 'left', 'right', 'top', 'bottom':
+            axis.spines[edge].set_visible(False)
+        self.__radio_axis = axis
 
         # create widget
         options = {'activecolor': 'steelblue'}
@@ -671,15 +710,15 @@ class AutoGUI:
         padding = height / 2
         x0, y0 = self.__abs_pos(1/3, 0) # 2/3 into bbox
 
+        options = dict()
+        options.update(self.slider_options)
         self.__remove_sliders() # remove old sliders
         for count, parameter in enumerate(model.parameters):
 
-            slider = Slider(
-                figure=self.figure,
-                location=[x0, y0 + self.bbox[3] - (1 + count)*height, width, height],
-                label=parameter.label,
-                bounds=parameter.bounds,
-                init_value=parameter.value)
+            slider = Slider(figure=self.figure,
+                            location=[x0, y0 + self.bbox[3] - (1 + count)*height, width, height],
+                            label=parameter.label, bounds=parameter.bounds, init_value=parameter.value,
+                            **options)
             slider.on_changed(self.__slider_update_function)
             self.sliders.append(slider)
 
@@ -727,3 +766,24 @@ class AutoGUI:
         if self.border is False:
             for edge in 'left', 'right', 'top', 'bottom':
                 self.__background_axis.spines[edge].set_visible(False)
+
+    def __create_fit_button(self) -> None:
+        """Create a button widget to calls the 'model.fit' function."""
+
+        # geometry
+        width = 0.08  # of figure
+        height = 0.05  # of figure
+        x0 = self.bbox[0] + self.bbox[2] - width - 0.03
+        y0 = self.bbox[1] - height  # under the bbox
+        self.__fit_button_ax = self.figure.add_axes([x0, y0, width, height])
+        self.__fit_button = widgets.Button(self.__fit_button_ax, label='Fit',
+                                           color='steelblue', hovercolor='lightgray')
+
+        self.__fit_button.on_clicked(self.__fit_button_on_clicked)
+
+    def __fit_button_on_clicked(self, event):
+        """Action to take when the 'Fit' button is pressed."""
+        # call the model.fit with data
+        self.model.fit(*self.data)
+        self.__update_graph()
+        self.__create_sliders(self.active_model.label)
