@@ -35,7 +35,7 @@ from matplotlib import widgets, patches
 
 from ..graphics.widgets import Slider
 from ..statistics.regression.modeling import Parameter, Model, CompositeModel, AutoGUI
-from ..statistics.distributions import linear1D, polynomial1D, sinusoid1D, voigt1D, blackbody
+from ..statistics.distributions import linear1D, polynomial1D, sinusoid1D, gaussian1D
 from ..datasets import SyntheticDataset
 
 
