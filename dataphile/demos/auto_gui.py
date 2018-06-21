@@ -15,7 +15,7 @@
 """Demonstration of `dataphile.statistics.regression.modeling.AutoGUI`.
    dataphile.demos.auto_gui
 
-   DataPhile, 0.1.0
+   DataPhile, 0.1.1
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
@@ -35,7 +35,7 @@ from matplotlib import widgets, patches
 
 from ..graphics.widgets import Slider
 from ..statistics.regression.modeling import Parameter, Model, CompositeModel, AutoGUI
-from ..statistics.distributions import linear1D, polynomial1D, sinusoid1D, voigt1D, blackbody
+from ..statistics.distributions import linear1D, polynomial1D, sinusoid1D, gaussian1D
 from ..datasets import SyntheticDataset
 
 

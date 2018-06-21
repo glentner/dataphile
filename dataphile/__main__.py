@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License (v3.0) along with this program.
 # If not, see <http://www.gnu.org/licenses/>.
 
-"""DataPhile, 0.1.0
+"""DataPhile, 0.1.1
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
