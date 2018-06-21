@@ -15,7 +15,7 @@
 """Package initialization for DataPhile project.
    dataphile.__init__
 
-   DataPhile, 0.1.0
+   DataPhile, 0.1.1
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
