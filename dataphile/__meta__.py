@@ -15,14 +15,14 @@
 """Metadata for DataPhile project.
    dataphile.__meta__
 
-   DataPhile, 0.1.1
+   DataPhile, 0.1.3
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
 
 
 __appname__   = 'dataphile'
-__version__   = '0.1.0'
+__version__   = '0.1.3'
 __authors__   = 'Geoffrey Lentner'
 __contact__   = '<glentner@gmail.com>'
 __license__   = 'GNU General Public License, v3'

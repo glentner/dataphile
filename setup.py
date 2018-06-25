@@ -16,7 +16,7 @@
 """Setup and installation script for DataPhile project.
    setup.py
 
-   DataPhile, 0.1.1
+   DataPhile, 0.1.3
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
