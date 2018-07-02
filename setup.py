@@ -35,7 +35,7 @@ from dataphile.__meta__ import (__appname__,
 
 CMD_PREFIX = 'data.'  # Change this to '' to remove prefix on all commands
 TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=name, module=module)
-         for name, module in {'phile':   '',
+         for name, module in {'phile':   '', #TODO: 'main' application remains undecided
                               'stream':  '.bin.stream',
                               'groupby': '.bin.groupby',
                               # TODO: 'connect': '.bin.connect',
