@@ -15,9 +15,8 @@ something others might find useful. See [components](#Components) below.
 <!-- Animated GIF of AutoGUI -->
 <img src="https://lentner.io/images/auto_gui_interactive.gif" width="80%"
 style="display:block;margin: 0 auto;">
-<p style="text-align:center;">
+
 **Figure**: Demonstration of Dataphile's `AutoGUI` feature.
-</p>
 
 Installation
 ------------
