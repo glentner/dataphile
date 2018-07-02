@@ -71,9 +71,9 @@ setup(
     long_description = readme_file(),
     classifiers      = ['Development Status :: 3 - Alpha',
                         'Topic :: Scientific/Engineering',
-                        'Programming Language :: Python :: 3.5'
-                        'Programming Language :: Python :: 3.6'
-                        'Programming Language :: Python :: 3.7'
+                        'Programming Language :: Python :: 3.5',
+                        'Programming Language :: Python :: 3.6',
+                        'Programming Language :: Python :: 3.7',
                         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)', ],
     install_requires = ['numpy', 'scipy', 'matplotlib', 'seaborn', 'pandas', 'astropy', 'tqdm',
                         'scikit-learn', 'keras', 'tensorflow', 'theano', 'h5py',],
