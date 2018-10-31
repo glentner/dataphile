@@ -33,6 +33,7 @@ from dataphile.__meta__ import (__appname__,
                                 __license__,
                                 __copyright__)
 
+
 CMD_PREFIX = 'data.'  # Change this to '' to remove prefix on all commands
 TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=name, module=module)
          for name, module in {'phile':   '', #TODO: 'main' application remains undecided
@@ -76,6 +77,6 @@ setup(
                         'Programming Language :: Python :: 3.7',
                         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)', ],
     install_requires = ['numpy', 'scipy', 'matplotlib', 'seaborn', 'pandas', 'astropy', 'tqdm',
-                        'scikit-learn', 'keras', 'tensorflow', 'theano', 'h5py',],
+                        'h5py',],
     entry_points     = {'console_scripts': TOOLS},
 )
