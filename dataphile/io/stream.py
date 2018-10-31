@@ -22,14 +22,16 @@
 
 
 # standard libs
+import io
 import os
-import re
+# import re
 import sys
 import time
-from typing import Any, Union, List, Dict, Tuple, IO, Callable, Generator, Iterator
+# import codecs
+# import functools
+from typing import Any, Union, List, Dict, IO, Generator, Iterator
 
 # internal libs
-from .common import select_reader, FileTypes
 from ..core.logging import log
 from ..core.wrappers import timeout
 
@@ -112,7 +114,7 @@ class Stream:
         for i, item in enumerate(name_or_buffers):
             if isinstance(item, str):
                 __files[item] = open(item, mode='rb', **self.options)
-            elif isinstance(item, FileTypes):
+            elif isinstance(item, (io.TextIOWrapper, io.BytesIO)):
                 __files[item.name] = item
             else:
                 raise TypeError(('Item {} in `Stream.files` assignment is not a valid type. '
@@ -149,7 +151,7 @@ class Stream:
         """Attempt to close the file by 'name'."""
         try:
             self.__files[name].close()
-        except ValueError as err:
+        except ValueError:
             pass  # std{out,in} don't close
 
     def __iter__(self) -> Iterator[Union[str, bytes]]:
@@ -261,4 +263,3 @@ class Stream:
         # go through the above mechanism (with a single notification) instead of
         # being removed here _and_ then being echoed through.
         self.__remove_old_files()
-
