@@ -12,7 +12,7 @@
 # You should have received a copy of the GNU General Public License (v3.0) along with this program.
 # If not, see <http://www.gnu.org/licenses/>.
 
-"""Dynamic/colorized logging facility for Dataphile project.
+"""Dynamic/colorized logging facility.
    dataphile.core.logging
 
    Dataphile, 0.1.3
@@ -20,15 +20,16 @@
    GNU General Public License v3. See LICENSE file.
 """
 
-
-# standard lib
-import io
-import os
+# standard libs
 import sys
-import platform
-from typing import List, Union, Iterator
-from datetime import datetime
+import re
+import inspect
+from collections import defaultdict
 
+from typing import Union, Callable, Dict, List, Any
+from io import TextIOWrapper
+from numbers import Number
+import datetime as dt
 
 ANSI_RESET = '\033[0m'
 ANSI_COLORS = {prefix: {color: '\033[{prefix}{num}m'.format(prefix=i + 3, num=j)
@@ -36,261 +37,335 @@ ANSI_COLORS = {prefix: {color: '\033[{prefix}{num}m'.format(prefix=i + 3, num=j)
                                                    'magenta', 'cyan', 'white'])}
                for i, prefix in enumerate(['foreground', 'background'])}
 
-LOG_COLORS = {'INFO':     'green',
-              'DEBUG':    'blue',
-              'WARNING':  'yellow',
-              'CRITICAL': 'magenta',
-              'ERROR':    'red'}
+LOG_COLORS = {'DEBUG': 'blue', 'INFO': 'green', 'WARNING': 'yellow',
+              'ERROR': 'red', 'CRITICAL': 'magenta'}
+
+LOG_LEVELS = {'DEBUG': 0, 'INFO': 1, 'WARNING': 2, 'ERROR': 4, 'CRITICAL': 5}
+LOG_VALUES = dict((v, k) for k, v in LOG_LEVELS.items())
+
+
+# Typing aliases
+ResourceType = Union[str, TextIOWrapper, 'Connection']
+CallbackType = Callable[[], Any]
 
 
 class Handler:
-    """Encapsulates a message format and output vector (stdout/stderr or a file)."""
+    """
+    Base handler for redirecting logging messages.
+    """
 
-    def __init__(self, template: str='{msg}', file: str=None, background: str=None, foreground: str=None, **lambdas):
-        """Initialize the Handler.
+    default_labels = ('message', 'level', 'LEVEL', 'num')
 
-           Parameters
-           ----------
-           template: str, default='{msg}'
-               Message template to be formatted. I.e., '...'.format(**lambdas).
-               "msg" is a reserved keyword for the contents to be printed.
-
-           file: str, default=None
-               If provided this is a path to write to a file. Every message will be
-               appended to this file.
-
-           background: str, default=None
-               Color for the text in the message when printed to stdout (e.g., 'red'). If None,
-               the system handles this.
-
-           foreground: str, default=None
-               Color for the text in the message when printed to stdout (e.g., 'white'). If None,
-               the system handles this.
-
-           **lambdas:
-               Lambda functions or other callable object. No arguments will be passed. If the object
-               is not callable it is assumed to be static and will be formatted (e.g., `str(x)`).
-               E.g., `timestamp=datetime.datetime.now`.
+    def __init__(self, level: str='INFO', template: str='{message}', **callbacks: CallbackType) -> None:
+        """
+        Initialize attributes, resource, callbacks.
         """
 
-        # members are protected, accessed/set with parameter syntax
-        self.__template   = template
-        self.__file       = file
-        self.__background = background
-        self.__foreground = foreground
-        self.__lambdas    = lambdas
+        self.__resource = None  # CallbackType
+        self.__counts = defaultdict(lambda: 0)
 
-        if foreground is not None and foreground not in ANSI_COLORS['foreground']:
-            raise ValueError('"{color}" is not a recognized foreground color. Options are {options}.'
-                             .format(color=foreground,
-                                     options=', '.join(ANSI_COLORS['foreground'].keys())))
-        if background is not None and background not in ANSI_COLORS['background']:
-            raise ValueError('"{color}" is not a recognized background color. Options are {options}.'
-                             .format(color=background,
-                                     options=', '.join(ANSI_COLORS['background'].keys())))
+        self.callbacks = callbacks  # must come before self.template initialization
+        self.template = template
+        self.level = level
 
-        for name, lambda_func in lambdas.items():
-            if '{' + name + '}' not in template:
-                raise ValueError('"{name}" is not in "template"'.format(name=name))
+    @property
+    def resource(self) -> ResourceType:
+        """Access underlying resource (e.g., file object or database connection)."""
+        return self.__resource
+
+    @resource.setter
+    def resource(self, other: ResourceType) -> None:
+        """Validate and assign underlying resource."""
+
+        if isinstance(other, str):
+            self.__resource = open(other, mode='a')
+
+        elif not all(hasattr(other, attr) for attr in ('__enter__', '__exit__', 'close')):
+            raise TypeError(f'{self.__class__.__qualname__}.resource is expected to be a '
+                            f'file-like or connection-like object (e.g., has \"__enter__\"), '
+                            f'given, {type(other)}.')
+        else:
+            self.__resource = other
 
     @property
     def template(self) -> str:
+        """Template defining the logging statement format."""
         return self.__template
 
-    @property
-    def file(self) -> str:
-        return self.__file
+    @template.setter
+    def template(self, other: str) -> None:
+        """Assign new value to template."""
 
-    @property
-    def background(self) -> str:
-        return self.__background
+        if not isinstance(other, str):
+            raise TypeError(f'{self.__class__.__qualname__}.template should be {str}.')
 
-    @property
-    def foreground(self) -> str:
-        return self.__foreground
+        elif '{message}' not in other:
+            raise ValueError(f'{self.__class__.__qualname__}.template requires that '
+                             '{message} at least be present in the string.')
 
-    @property
-    def lambdas(self) -> dict:
-        return self.__lambdas
-
-    def write_to_file(self, msg: str, **options) -> None:
-        """Write a message to `file`."""
-
-        # gather and/or execute lambdas
-        lambdas = {name: str(lambda_func) if not hasattr(lambda_func, '__call__') else str(lambda_func())
-                   for name, lambda_func in self.lambdas.items()}
-
-        with open(self.file, 'a') as file_object:
-            print(self.template.format(msg=msg, **lambdas), file=file_object, **options)
-
-    def write_to_console(self, msg: str, file=sys.stdout, **options) -> None:
-        """Write a message to stdout/stderr using the print() function."""
-
-        # initial lambda construction has no ansi formatting
-        lambdas = {name: str(lambda_func) if not hasattr(lambda_func, '__call__') else str(lambda_func())
-                   for name, lambda_func in self.lambdas.items()}
-
-        # now apply formatting
-        level = self.current_call_loglevel
-        lambdas = {name: ANSI_COLORS['foreground'][LOG_COLORS[level]] + value + ANSI_RESET
-                   for name, value in lambdas.items()}
-
-        if self.foreground is None:
-            message = msg
         else:
-            message = ANSI_COLORS['foreground'][self.foreground] + msg + ANSI_RESET
+            for label, callback in self.callbacks.items():
+                format_entry = '{' + label + '}'
+                if format_entry not in other:
+                    raise ValueError(f'{self.__class__.__qualname__}.template is missing '
+                                     f'{format_entry} implied in keyword arguments.')
 
-        output = self.template.format(msg=message, **lambdas)
-        if self.background is not None:
-            output = ANSI_COLORS['background'][self.background] + output + ANSI_RESET
+            for match in re.finditer(r'{(\w*)(:\S*}|})', other):
+                label = match.groups()[0]
+                format_entry = '{' + label + '}'
+                if label not in self.callbacks.keys() and label not in self.default_labels:
+                    raise KeyError(f'{self.__class__.__qualname__}.template contains '
+                                   f'{format_entry} but \"{label}\" was provided as a callback (kwarg).')
 
-        print(output, flush=True, file=file, **options)
+            self.__template = other
 
-    def write(self, msg: str, level: str, file=sys.stdout, **options) -> None:
-        """Generic function which writes the `msg` to the appropriate stream."""
+    @property
+    def callbacks(self) -> Dict[str, CallbackType]:
+        """Access callbacks (usually, lambda functions)."""
+        return self.__callbacks
 
-        # set member so we can call on it
-        self.current_call_loglevel = level.upper()
+    @callbacks.setter
+    def callbacks(self, other: Dict[str, CallbackType]) -> None:
+        """Validate and assign callbacks dictionary."""
+        if not isinstance(other, dict):
+            raise TypeError(f'{self.__class__.__qualname__}.callbacks should be {dict}, '
+                            f'given {type(other)}')
 
-        if self.file is not None:
-            self.write_to_file(msg, **options)
+        for key in other.keys():
+            if not isinstance(key, str):
+                raise TypeError(f'{self.__class__.__qualname__}.callbacks requires all keys to '
+                                f'be string-like, found {key} -> {type(key)}')
+
+        for label, callback in other.items():
+            if not hasattr(callback, '__call__'):
+                raise TypeError(f'{self.__class__.__qualname__}.callbacks requires all values be '
+                                f'callable, {label} has no attribute \"__call__\".')
+
+        for label, callback in other.items():
+            if not len(inspect.signature(callback).parameters) == 0:
+                raise ValueError(f'{self.__class__.__qualname__}.callbacks requires all callables/functions have '
+                                 f'zero parameters, found {label}{inspect.signature(callback)}.')
         else:
-            self.write_to_console(msg, file=file, **options)
-
-
-class LoggerBase:
-    """Mixin class to implement logging functionality.
-
-       This class does not implement an __init__ method so the setup of the logging
-       features can be done in the derived classes __init__ method.
-    """
-
-    __defaultlevel__ = 'INFO'
-    __loglevels__ = {'DEBUG': 1, 'INFO': 2, 'WARNING': 3, 'CRITICAL': 4, 'ERROR': 5}
-
-    __level = __defaultlevel__
-    # handlers = list()  # this creates duplicate handlers!
-
-    def log(self, msg: str, level: str='INFO', **options) -> None:
-        """Write `msg` to all :`handlers`."""
-
-        if level.upper() not in self.__loglevels__:
-            raise ValueError('"{level}" is not an available level. Options are {options}'
-                             .format(level=level, options=', '.join(self.__loglevels__.keys())))
-
-        elif self.__loglevels__[self.level] > self.__loglevels__[level]:
-            # only print messages as/more severe as the current level
-            return
-        else:
-            for handler in self.handlers:
-                handler.write(msg, level, **options)
-
-    def debug(self, msg: str, **options) -> None:
-        """Write a message with level='DEBUG'."""
-        self.log(msg, level='DEBUG', file=sys.stdout, **options)
-
-    def info(self, msg: str, **options) -> None:
-        """Write a message with level='INFO'."""
-        self.log(msg, level='INFO', file=sys.stdout, **options)
-
-    def warning(self, msg: str, **options) -> None:
-        """Write a message with level='WARNING'."""
-        self.log(msg, level='WARNING', file=sys.stderr, **options)
-
-    def critical(self, msg: str, **options) -> None:
-        """Write a message with level='CRITICAL'."""
-        self.log(msg, level='CRITICAL', file=sys.stderr, **options)
-
-    def error(self, msg: str, **options) -> None:
-        """Write a message with level='ERROR'."""
-        self.log(msg, level='ERROR', file=sys.stderr, **options)
-
-    def add_handler(self, handler: Handler) -> None:
-        """Add a 'handler' (of type `Handler`) to the list of used handlers."""
-        if not isinstance(handler, Handler):
-            raise TypeError('Logger.add_handler requires `Handler` type.')
-        if not hasattr(self, 'handlers'):
-            self.handlers = list()
-        self.handlers.append(handler)
+            self.__callbacks = other
 
     @property
     def level(self) -> str:
-        """Retrieve the logging `level` (e.g., INFO, DEBUG, ...)."""
+        """Logging level for Handler."""
         return self.__level
 
     @level.setter
-    def level(self, value: Union[int, str]) -> None:
-        """Set the logging level."""
-        if isinstance(value, int):
-            if value not in self.__loglevels__.values():
-                raise ValueError('Available loglevels: {}'.format(self.__loglevels__))
+    def level(self, other: Union[str, Number]) -> None:
+        """Validate and assign logging level for this Handler."""
+        if isinstance(other, str):
+            if other.upper() not in LOG_LEVELS.keys():
+                raise ValueError(f'{self.__class__.__qualname__}.level expects one of '
+                                 f'{tuple(LOG_LEVELS.keys())}')
             else:
-                self.__level = {v: k for v, k in self.__loglevels__.items()}[value]
-        elif isinstance(value, str):
-            if value.upper() not in self.__loglevels__:
-                raise ValueError('Can only set log level to one of {}'.format(list(self.__loglevels__)))
+                self.__level = other.upper()
+
+        elif isinstance(other, Number):
+            if int(other) not in LOG_LEVELS.values():
+                raise ValueError(f'{self.__class__.__qualname__}.level accepts integers between 0-5'
+                                 f', given {other}.')
             else:
-                self.__level = value.upper()
+                self.__level = LOG_VALUES[int(other)]
 
-    @property
-    def files(self) -> List[str]:
-        """Return a list of file names where logging statements are being printed."""
-        return [h.file for h in self.handlers if h.file is not None]
-
-    @property
-    def file_handles(self) -> List[io.TextIOWrapper]:
-        """Returns a generator yielding open file handlers to all the files in use."""
-        for filepath in self.files:
-            with open(filepath, mode='a') as file_handle:
-                yield file_handle
-
-
-class Logger(LoggerBase):
-    """Dedicated Logging object."""
-
-    def __init__(self, loglevel: str='INFO', files: List[str]=None, folder: str=None, app: str='',
-                 console: bool=True, template: str='{level} {time} {app} {msg}'):
-        """Initialize the handlers."""
-
-        # default level
-        self.level = loglevel
-
-        if platform.system() == 'Windows':
-            timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')  # Windows compatible filename
         else:
-            timestamp = datetime.now().strftime('%Y%m%d-%H:%M:%S')
+            raise TypeError(f'{self.__class__.__qualname__}.level requires either a string-like or '
+                            f'number-like value, given {type(other)}.')
 
-        # send log messages to stdout
-        if console is True:
-            self.add_handler(Handler(template = template,
-                                     level    = lambda: self.handlers[0].current_call_loglevel,
-                                     time     = datetime.now,
-                                     app      = app))
+    @property
+    def counts(self) -> Dict[str, int]:
+        """Counter of number of times each level has been written to."""
+        return self.__counts
 
-        # file output
-        if files:
-            for path in files:
-                if not os.path.isdir(os.path.dirname(path)):
-                    raise IOError('{} does not exist'.format(os.path.dirname(path)))
-                else:
-                    self.add_handler(Handler(template   = template,
-                                            file       = path,
-                                            level      = lambda: self.handlers[0].current_call_loglevel,
-                                            time       = datetime.now,
-                                            app        = app))
+    def __del__(self) -> None:
+        """Release "resource"."""
+        if hasattr(self.resource, 'close'):
+            self.resource.close()
 
-        if folder:
-            if not os.path.isdir(os.path.dirname(folder)):
-                raise IOError('{} is not a directory'.format(os.path.dirname(folder)))
-            elif not os.path.isdir(folder):
-                os.makedirs(folder)
-            filename = '{}{}.log'.format(app + '-' if app else '', timestamp)
-            self.add_handler(Handler(template   = template,
-                                     file       = filename,
-                                     level      = lambda: self.handlers[0].current_call_loglevel,
-                                     app        = app,
-                                     time       = datetime.now))
+    def write(self, message: str, level: str, colorize: bool=False) -> None:
+        """Filters out messages based on 'level' and sends to target resource."""
+
+        # check valid level assignment
+        if level.upper() not in LOG_LEVELS:
+            raise ValueError(f'{self.__class__.__qualname__}.level expects one of '
+                             f'{tuple(LOG_LEVELS.keys())}')
+
+        # increment call count
+        self.counts[level.upper()] += 1
+
+        # only proceed if level is sufficient
+        if LOG_LEVELS[level.upper()] < LOG_LEVELS[self.level]:
+            return
+
+        # initial construction has no formatting
+        callback_results = {label: str(callback()) for label, callback in self.callbacks.items()}
+
+        if '{level}' in self.template:
+            callback_results['level'] = level.lower()
+
+        if '{LEVEL}' in self.template:
+            callback_results['LEVEL'] = level.upper()
+
+        if '{num}' in self.template:
+            callback_results['num'] = str(self.counts[level.upper()])
+
+        if colorize is True:
+            ANSI_CODE = ANSI_COLORS['foreground'][LOG_COLORS[level.upper()]]
+            callback_results = {label: ANSI_CODE + value + ANSI_RESET
+                                for label, value in callback_results.items()}
+
+        message = self.template.format(**{'message': message, **callback_results})
+        message = message.strip('\n') + '\n'
+        self._write(message)
+
+    def _write(self, message: str) -> None:
+        """Flush prepared/formatted string 'message' to resource."""
+        self.resource.write(message)
+        self.resource.flush()
+
+    def __str__(self) -> str:
+        """String representation of Handler."""
+        return (f'{self.__class__.__name__}(template=\'{self.template}\', '
+                f'level=\'{self.level}\')')
+
+    def __repr__(self) -> str:
+        """String representation of Handler."""
+        return str(self)
 
 
-# shared instance across whole package
-log = Logger()
+class FileHandler(Handler):
+    """
+    Handles logging messages targeting a file-like object.
+    """
+
+    def __init__(self, *args, file: Union[str, TextIOWrapper], **kwargs) -> None:
+        """
+        See Also:
+        Handler.__init__()
+            For full signature and descriptions.
+        """
+        super().__init__(*args, **kwargs)
+        self.resource = file
+
+
+class ConsoleHandler(Handler):
+    """
+    Handles logging messages targeting <stdout/stderr>.
+    """
+
+    default_stream = {'DEBUG':    sys.stdout,
+                      'INFO':     sys.stdout,
+                      'WARNING':  sys.stderr,
+                      'ERROR':    sys.stderr,
+                      'CRITICAL': sys.stderr}
+
+    def __init__(self, *args, colorize: bool=True,
+                 stderr_only: bool=False, **kwargs) -> None:
+        """
+        See Also:
+        Handler.__init__()
+            For full signature and descriptions.
+        """
+        super().__init__(*args, **kwargs)
+        self.colorize = colorize
+        if stderr_only is True:
+            self.default_stream.update({'DEBUG': sys.stderr,
+                                        'INFO': sys.stderr})
+
+    def write(self, *args, level: str, **kwargs) -> None:
+        """Writes to <stdout> for DEBUG/INFO, <stderr> otherwise."""
+        self.resource = self.default_stream[level.upper()]
+        super().write(*args, level=level, colorize=self.colorize, **kwargs)
+
+
+# TODO: implement DBHandler
+class DBHandler(Handler):
+    """
+    Handles logging messages targeting a database-like object.
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        """Initialize database connection."""
+        raise NotImplementedError()
+
+    def _write(self, message: str) -> None:
+        """Reimplementation of _write sends 'message' to database."""
+        raise NotImplementedError()
+
+
+class BasicLogger:
+    """
+    Relays logging messages to all member handlers.
+    """
+
+    def __init__(self, handlers: List[Handler]) -> None:
+        """
+        Initialize list of member handlers.
+        """
+        self.__handlers = list()
+        for handler in handlers:
+            self.add_handler(handler)
+
+    @property
+    def handlers(self) -> List[Handler]:
+        """Access to member handlers."""
+        return self.__handlers
+
+    def add_handler(self, handler: Handler) -> None:
+        """Add a Handler to list of members."""
+        if not isinstance(handler, Handler):
+            raise TypeError(f'{self.__class__.__qualname__}.add_handler expects {Handler}, '
+                            f'given {type(handler)}.')
+        else:
+            self.__handlers.append(handler)
+
+    def write(self, *args, **kwargs) -> None:
+        """Relays call to all handlers."""
+        for handler in self.handlers:
+            handler.write(*args, **kwargs)
+
+    def debug(self, message: str, *args, **kwargs) -> None:
+        """Calls write() with level='debug'."""
+        self.write(message, *args, level='DEBUG', **kwargs)
+
+    def info(self, message: str, *args, **kwargs) -> None:
+        """Calls write() with level='info'."""
+        self.write(message, *args, level='INFO', **kwargs)
+
+    def warning(self, message: str, *args, **kwargs) -> None:
+        """Calls write() with level='warning'."""
+        self.write(message, *args, level='WARNING', **kwargs)
+
+    def error(self, message: str, *args, **kwargs) -> None:
+        """Calls write() with level='error'."""
+        self.write(message, *args, level='ERROR', **kwargs)
+
+    def critical(self, message: str, *args, **kwargs) -> None:
+        """Calls write() with level='critical'."""
+        self.write(message, *args, level='CRITICAL', **kwargs)
+
+    def __str__(self) -> str:
+        """String representation of Logger."""
+        class_name = self.__class__.__name__
+        left_spacing = ' ' * (len(class_name) + 2)
+        handler_reprs = f',\n{left_spacing}'.join([str(handler) for handler in self.handlers])
+        return f'{class_name}([{handler_reprs}])'
+
+    def __repr__(self) -> str:
+        """String representation of Logger."""
+        return str(self)
+
+
+# registry of loggers
+LOGGERS = dict()  # Dict[str, BasicLogger]
+
+
+_basic_console_handler = ConsoleHandler(template='{level} {timestamp} {message}',
+                                        timestamp=lambda: dt.datetime.now().strftime('%H:%M:%S'))
+
+# _basic_file_handler = FileHandler(template='{LEVEL}:num {timestamp} {name}: {message}',
+#                                   timestamp=lambda: dt.datetime.now().strftime('%H:%M:%S'))
+
+log = BasicLogger([_basic_console_handler])
