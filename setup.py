@@ -16,7 +16,7 @@
 """Setup and installation script for Dataphile project.
    setup.py
 
-   Dataphile, 0.1.4
+   Dataphile, 0.1.5
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
@@ -38,6 +38,7 @@ TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=
          for name, module in {'phile':   '',  # TODO: 'main' application remains undecided
                               'stream':  '.bin.stream',
                               'groupby': '.bin.groupby',
+                              'gunzip':  '.bin.gunzip',
                               # TODO: 'connect': '.bin.connect',
                               # TODO: 'watch':   '.bin.watch',
                               # TODO: 'monitor': '.bin.monitor',

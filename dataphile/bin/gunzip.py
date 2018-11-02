@@ -12,8 +12,8 @@
 # You should have received a copy of the GNU General Public License (v3.0) along with this program.
 # If not, see <http://www.gnu.org/licenses/>.
 
-"""Stream data from files (similar to standard Unix command 'cat').
-   dataphile.bin.stream
+"""Decompress zlib compressed files (gzip compatible).
+   dataphile.bin.gunzip
 
    Dataphile, 0.1.5
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
@@ -21,17 +21,13 @@
 """
 
 # standard libs
-import os
 import sys
 import argparse
 import platform
 
-# external libs
-from tqdm import tqdm
-
 # internal libs
-from ..io.stream import BinaryStream, LiveBinaryStream
-
+from ..io.stream import BinaryStream
+from ..io.zlib import iterdecompress
 
 if platform.system() == 'Windows':
     # FIXME: how do we ignore broken pipes on windows?
@@ -42,48 +38,29 @@ else:
 
 
 parser = argparse.ArgumentParser(description=__doc__.split('\n')[0].strip())
-parser.add_argument('sources', metavar='FILE', nargs='+',
-                    help='paths to data files')
+parser.add_argument('source', metavar='FILE', default=[], nargs='?',
+                    help='path to file')
 parser.add_argument('-b', '--buffersize', type=float, default=1.0,
                     help='buffer size (in MB)')
-parser.add_argument('-m', '--monitor', dest='use_progress_bar', action='store_true',
-                    help='display progress bar')
-live_group = parser.add_mutually_exclusive_group()
-live_group.add_argument('-l', '--live', action='store_true',
-                        help='maintain connection and wait for new data')
-live_group.add_argument('-L', '--latency', type=float, default=0.1,
-                        help='maintain connection and wait for new data')
-
+parser.add_argument('--encoding', default='utf-8',
+                    help='encoding for data')
 
 def main() -> int:
     """Entry point for 'stream' command."""
 
-    monitor = None
-
     try:
         argv = parser.parse_args()
-        Stream = LiveBinaryStream if argv.live is True else BinaryStream
         buffsize = int(argv.buffersize * 1024**2)
 
-        options = dict()
-        if argv.live is True:
-            options.update({'latency': argv.latency})
-
-        if argv.use_progress_bar is True:
-            monitor = tqdm(total=sum(map(os.path.getsize, argv.sources)),
-                           unit='B', unit_scale=True, unit_divisor=1024)
-
-        with Stream(*argv.sources, **options) as stream:
-            for buff in stream.iterbuffers(buffsize):
-                sys.stdout.buffer.write(buff)
-                if monitor is not None:
-                    monitor.update(len(buff))
+        with BinaryStream(*argv.source) as stream:
+            for buff in iterdecompress(stream.iterbuffers(buffsize),
+                                       encoding=argv.encoding):
+                sys.stdout.write(buff)
 
     except KeyboardInterrupt:
         pass
 
     finally:
-        if monitor is not None:
-            monitor.close()
+        sys.stdout.buffer.flush()
 
     return 0
