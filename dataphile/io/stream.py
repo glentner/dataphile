@@ -22,244 +22,298 @@
 
 
 # standard libs
-import io
 import os
-# import re
 import sys
 import time
-# import codecs
-# import functools
-from typing import Any, Union, List, Dict, IO, Generator, Iterator
+import functools
+import itertools
+from typing import Any, List, IO, Union, Generator, Iterable
 
 # internal libs
-from ..core.logging import log
-from ..core.wrappers import timeout
+from abc import ABC as AbstractBase, abstractproperty
 
 
-class Stream:
-    """File I/O manager."""
+# used to represent both buffer types.
+BuffType = Union[bytes, str]
 
-    def __init__(self, *files: Union[str,IO], live: bool=False, watch: bool=False, **options: Any):
-        """Create a new 'Stream'.
+class BaseStream(AbstractBase):
+    """
+    Generic Stream base class.
 
-        Parameters
-        ----------
-        *files: [str,IO]
-            File paths or file-like objects to read from.
-        live: bool (default=False)
-            Persist existing file handles and wait for new data.
-        watch: bool (default=False)
-            Accept new file paths from <stdin> to read from.
-        **options: Any
-            Further keyword arguments passed to the file *.open(...) methods.
+    This holds common functionality and enforces inheritance
+    requirements, such is a derived `read` method.
+    """
+
+    def __init__(self, *sources: str, **options: Any) -> None:
         """
-        # Assignments are transacted by *.setter property methods
-        self.live = live
-        self.watch = watch
-        self.options = options
-        if watch is True and not files:
-            self.files = []
-        elif not files:
-            self.files = [sys.stdin.buffer]
+        Initialize with input file 'sources'.
+
+        Arguments
+        ---------
+        *sources: str
+            Valid file paths to initialize input files with.
+
+        **options: Any
+            Named parameters are forwarded to the initializer.
+            For example, encoding='latin-1'.
+        """
+
+        self._active = None  # must be before self.sources assignment
+        self.options = options  # must before self.sources assignment
+        self.sources = sources
+
+        self._active_id = 0
+        if not self.sources:
+            self._active = self._default_source
         else:
-            self.files = list(files)
+            for source in self.sources:
+                if not os.path.exists(source):
+                    raise ValueError(f'{self.__class__.__qualname__}.__init__: '
+                                     f'{source} is not a file.')
+            self.active = self.sources[0]
+
+    @abstractproperty
+    def _mode(self) -> str:
+        """Passed to `open` command."""
+        raise NotImplementedError()
+
+    @abstractproperty
+    def _sentinel(self) -> None:
+        """Sentinel value for `iter`."""
+        raise NotImplementedError()
+
+    @abstractproperty
+    def _default_source(self) -> IO:
+        """Either `sys.stdin` or `sys.stdin.buffer`."""
+        raise NotImplementedError()
 
     @property
-    def live(self) -> bool:
-        """Create 'live' connection to files (i.e., wait for more data to arrive)."""
-        return self.__live
+    def sources(self) -> List[str]:
+        """List of file paths used for stream."""
+        return self._sources
 
-    @live.setter
-    def live(self, value: bool) -> None:
-        """Set live mode."""
-        if value not in (True, False):
-            raise TypeError('`Stream.live` setting is either True or False.')
-        else:
-            self.__live = value
-
-    @property
-    def watch(self) -> bool:
-        """Accept new file locations from <stdin>."""
-        return self.__watch
-
-    @watch.setter
-    def watch(self, value: bool) -> None:
-        """Set 'watch' mode."""
-        if value not in (True, False):
-            raise TypeError('`Stream.watch` setting is either True or False.')
-        else:
-            self.__watch = value
+    @sources.setter
+    def sources(self, other: List[str]) -> None:
+        """Validate and assign sources."""
+        for i, value in enumerate(other):
+            if not isinstance(value, str):
+                raise ValueError(f'{self.__class__.__qualname__}.sources expects List[str], '
+                                 f'given {type(value)} at position {i}.')
+        self._sources = list(other)
+        self.active = self._sources[0]
 
     @property
-    def options(self) -> Dict[str,Any]:
-        """Key-word arguments to pass to file opener calls (e.g., encoding='utf-8')."""
-        return self.__options
+    def active(self) -> IO:
+        """The currently active IO."""
+        return self._active
 
-    @options.setter
-    def options(self, value: Dict[str,Any]) -> None:
-        """Set options dictionary for file opening."""
-        if not isinstance(value, dict) or not all(isinstance(key, str) for key in value.keys()):
-            raise ValueError('`Stream.options` must be type Dict[str,Any].')
+    @active.setter
+    def active(self, other: str) -> None:
+        """Validate and initialize next active IO."""
+        if not isinstance(other, str):
+            raise ValueError(f'{self.__class__.__qualname__}.active expects a <str> (file path), '
+                             f'given {other}({type(other)}).')
+        next_active = open(other, mode=self._mode, **self.options)
+        if self._active is not None and self._active is not self._default_source:
+            self._active.close()
+        self._active = next_active
+
+    def _next_active(self) -> None:
+        """Cycle the active source."""
+        self._active_id += 1
+        self.active = self.sources[self._active_id]
+
+    def read(self, buffsize: int=1024**2) -> BuffType:
+        """Read bytes from currently active IO."""
+        buff = self.active.read(buffsize)
+        if buff == self._sentinel:
+            try:
+                self._next_active()
+                return self.read(buffsize)
+            except IndexError:
+                return self._sentinel
         else:
-            self.__options = value.copy()
+            return buff
 
-    @property
-    def files(self) -> List[IO]:
-        return list(self.__files.values())
+    def iterbuffers(self, buffsize: int) -> Generator[str, BuffType, None]:
+        """Yield buffers of size 'buffsize'."""
+        yield from iter(functools.partial(self.read, buffsize),
+                        self._sentinel)
 
-    @files.setter
-    def files(self, name_or_buffers: List[Union[str, IO]]) -> None:
-        """Assign/open file objects."""
-        __files = dict()  # Dict[str,IO]
-        for i, item in enumerate(name_or_buffers):
-            if isinstance(item, str):
-                __files[item] = open(item, mode='rb', **self.options)
-            elif isinstance(item, (io.TextIOWrapper, io.BytesIO)):
-                __files[item.name] = item
-            else:
-                raise TypeError(('Item {} in `Stream.files` assignment is not a valid type. '
-                                 '`io.TextIOWrapper` or `io.BufferedReader` accepted. '
-                                 'Received {}').format(i+1, type(item)))
+    def __del__(self) -> None:
+        """Ensure the active IO is closed."""
+        if self.active is not self._default_source:
+            self._active.close()
 
-        # make assignment only after successful construction
-        self.__files = __files
+    def __exit__(self, *errs) -> None:
+        """Context manager exit."""
+        self.__del__()
 
-    def __enter__(self):
-        """Used by context manager to open files."""
+    def __enter__(self) -> 'BaseStream':
+        """Context manager enter."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Used by context manager to safely exit."""
-        self.close_all()
+    def __str__(self) -> str:
+        """String representation."""
+        sources = ', '.join(self.sources)
+        options = ', '.join([f'{key}={value}' for key, value in self.options.items()])
+        clsname = f'{self.__class__.__name__}'
+        return f'<{clsname}({sources}, {options})>'
 
-    def remove(self, name: str) -> None:
-        """Attempt to remove file by 'name' from dictionary."""
-        self.close(name)
-        del self.__files[name]
+    def __repr__(self) -> str:
+        """Representation."""
+        return str(self)
 
-    def remove_all(self) -> None:
-        """Attempt to remove all files from dictionary."""
-        for name in self.__files.keys():
-            self.remove(name)
 
-    def close_all(self) -> None:
-        """Close all opened files."""
-        for name in self.__files.keys():
-            self.close(name)
+class BinaryStream(BaseStream):
+    """An Stream that returns `binary` buffers."""
 
-    def close(self, name: str) -> None:
-        """Attempt to close the file by 'name'."""
-        try:
-            self.__files[name].close()
-        except ValueError:
-            pass  # std{out,in} don't close
+    _mode = 'rb'
+    _sentinel = b''
+    _default_source = sys.stdin.buffer
 
-    def __iter__(self) -> Iterator[Union[str, bytes]]:
-        """Iterate over all files (as if from a single file)."""
-        yield from self.readlines()
 
-    def read(self, buffersize: int=1024) -> Generator[Union[str, bytes], None, None]:
-        """Read all data from each open file."""
-        for fp in self.files:
-            data = True
-            while data:
-                data = fp.read(buffersize)
-                yield data
+class TextStream(BaseStream):
+    """An Stream that returns `str` buffers."""
 
-    def readlines(self, buffersize: int=1024) -> Generator[Union[str,bytes], None, None]:
-        """Read all data from each open file in whole line increments."""
-        for fp in self.files:
-            data = True
-            while data:
-                data = fp.read(buffersize) + fp.readline()
-                yield data
+    _mode = 'r'
+    _sentinel = ''
+    _default_source = sys.stdin
 
-    def read_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str, bytes], None, None]:
-        """Yield back chunks of data of size 'buffersize' and await new data.
+    def readline(self) -> str:
+        """Return the next line."""
+        line = self.active.readline()
+        if line == self._sentinel:
+            try:
+                self._next_active()
+                return self.readline()
+            except IndexError:
+                return self._sentinel
+        else:
+            return line
 
-           Parameters
-           ----------
-           buffersize: int (default=1024)
-               Number of bytes to read at a time.
+    def iterlines(self) -> Generator[int, str, None]:
+        """Yields back whole lines."""
+        yield from iter(self.readline, self._sentinel)
 
-           latency: float (default=0.1)
-               Number of seconds to wait before attempting to read data again.
+    def readlines(self) -> List[str]:
+        """Return all lines from file."""
+        return list(self.iterlines())
 
-           Yields
-           ------
-           buffer: bytes
-               Data from open files.
-        """
-        try:
-            while True:
-                yield from self.read(buffersize)
-                time.sleep(latency)
-                if self.watch is True:
-                    self.__update_files()
-        except KeyboardInterrupt:
-            pass
 
-    def readlines_live(self, buffersize: int=1024, latency: float=0.1) -> Generator[Union[str, bytes], None, None]:
-        """Yield back chunks of data of size 'buffersize' in whole line increments and await new data.
+class LiveStream(BaseStream):
+    """
+    Similar to a normal Stream, but all files remain open and will
+    be cycled through indefinitely waiting for new data.
+    See Also:
+        BaseStream
+    """
+    _latency = 0.1
 
-           Parameters
-           ----------
-           buffersize: int (default=1024)
-               Number of bytes to read at a time.
-           latency: float (default=0.1)
-               Number of seconds to wait before attempting to read data again.
-               Only relavent when live==True.
+    def __init__(self, *sources, latency: float=0.1, **options) -> None:
+        """Opens all files at start."""
 
-           Yields
-           ------
-           buffer: bytes
-               Data from open files.
-        """
-        try:
-            while True:
-                yield from self.readlines(buffersize)
-                time.sleep(latency)
-                if self.watch is True:
-                    self.__update_files()
-        except KeyboardInterrupt:
-            pass
+        self.latency = latency
+        self.options = options
+        self.sources = sources
 
-    def __remove_old_files(self) -> None:
-        """Check existing file handles and remove any that no longer exist."""
-        for path in self.__files.keys():
-            if path not in ('<stdin>',) and not os.path.isfile(path):
-                log.warning('removing "{}" because it does not exist.'.format(path))
-                self.remove(path)
+        if not sources:
+            self._handles = itertools.cycle([self._default_source])
+        else:
+            self._handles = itertools.cycle([open(source, mode=self._mode, **options)
+                                             for source in sources])
+        self._active = next(self.handles)
 
-    @timeout(1, action=None)
-    def __check_new_file(self) -> None:
-        """Check for new files from <stdin>. A timeout of 1-sec prevents blocking."""
-        return sys.stdin.readline().strip()
+    @property
+    def latency(self) -> float:
+        """Seconds to wait between active sources."""
+        return self._latency
 
-    def __update_files(self) -> None:
-        """Remove non-existent files and check <stdin> for file paths."""
-        # continue to read file paths off <stdin> until None is returned (after 1-sec delay)
-        newfiles = list()  # List[str]
-        while True:
-            path = self.__check_new_file()
-            if path is not None:
-                newfiles.append(path)
-            else:
-                break
-        for path in newfiles:
-            if not os.path.isfile(path):
-                if path in self.__files:
-                    log.warning('removing "{}" from sources as file no longer exists.'.format(path))
-                    self.remove(path)
-                else:
-                    log.warning('ignoring "{}" because it is not a file.'.format(path))
-            else:
-                if path in self.__files:
-                    log.debug('ignoring "{}" because it is already a source.'.format(path))
-                else:
-                    self.__files[path] = open(path, mode='rb', **self.options)
-        # remove missing/deleted files _after_ checking
-        # if the file was sent through <stdin> _because_ it was deleted, let it
-        # go through the above mechanism (with a single notification) instead of
-        # being removed here _and_ then being echoed through.
-        self.__remove_old_files()
+    @latency.setter
+    def latency(self, value: float) -> None:
+        """Coerse and assign value."""
+        self._latency = float(value)
+
+    @property
+    def active(self) -> IO:
+        """Currently active handle."""
+        return self._active
+
+    @active.setter
+    def active(self, other: str) -> None:
+        raise NotImplementedError('Cannot set the active handle for a LiveStream.')
+
+    @property
+    def sources(self) -> List[str]:
+        """List of file paths used for stream."""
+        return self._sources
+
+    @sources.setter
+    def sources(self, other: List[str]) -> None:
+        """Validate and assign sources."""
+        for i, value in enumerate(other):
+            if not isinstance(value, str):
+                raise ValueError(f'{self.__class__.__qualname__}.sources expects List[str], '
+                                 f'given {type(value)} at position {i}.')
+        self._sources = list(other)
+        # the self.active assignment is removed from a LiveStream
+
+    @property
+    def handles(self) -> Iterable[IO]:
+        """Cycler of open IO handles."""
+        return self._handles
+
+    def read(self, buffsize: int=1024**2) -> BuffType:
+        """Read buffer of size 'buffsize' from active handle."""
+        buff = self.active.read(buffsize)
+        if buff == self._sentinel:
+            self._active = next(self.handles)
+            time.sleep(self.latency)
+            return self.read(buffsize)
+        else:
+            return buff
+
+    def __del__(self) -> None:
+        """Close all file handles."""
+        if self.sources:
+            for i, handle in enumerate(self.handles):
+                handle.close()
+                if i > len(self.sources):
+                    break  # would never exit otherwise
+
+
+class LiveBinaryStream(LiveStream):
+    """
+    Reads binary data from a LiveStream.
+    See Also:
+        LiveStream
+    """
+    _mode = 'rb'
+    _sentinel = b''
+    _default_source = sys.stdin.buffer
+
+
+class LiveTextStream(LiveStream):
+    """
+    Reads text from a LiveStream.
+    See Also:
+        LiveStream
+    """
+
+    _mode = 'r'
+    _sentinel = ''
+    _default_source = sys.stdin
+
+    def readline(self) -> str:
+        """Return the next line."""
+        line = self.active.readline()
+        if line == self._sentinel:
+            self._active = next(self.handles)
+            time.sleep(self.latency)
+            return self.readline()
+        else:
+            return line
+
+    def iterlines(self) -> Generator[int, str, None]:
+        """Yields back whole lines."""
+        yield from iter(self.readline, self._sentinel)
