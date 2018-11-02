@@ -15,7 +15,7 @@
 """Demonstration of `dataphile.statistics.regression.modeling.AutoGUI`.
    dataphile.demos.auto_gui
 
-   Dataphile, 0.1.3
+   Dataphile, 0.1.4
    Copyright (c) Geoffrey Lentner 2018. All rights reserved.
    GNU General Public License v3. See LICENSE file.
 """
