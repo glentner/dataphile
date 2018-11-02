@@ -22,7 +22,7 @@
 
 
 __appname__   = 'dataphile'
-__version__   = '0.1.3'
+__version__   = '0.1.4'
 __authors__   = 'Geoffrey Lentner'
 __contact__   = '<glentner@gmail.com>'
 __license__   = 'GNU General Public License, v3'
