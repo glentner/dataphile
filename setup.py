@@ -30,13 +30,12 @@ from dataphile.__meta__ import (__appname__,
                                 __version__,
                                 __authors__,
                                 __contact__,
-                                __license__,
-                                __copyright__)
+                                __license__)
 
 
 CMD_PREFIX = 'data.'  # Change this to '' to remove prefix on all commands
 TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=name, module=module)
-         for name, module in {'phile':   '', #TODO: 'main' application remains undecided
+         for name, module in {'phile':   '',  # TODO: 'main' application remains undecided
                               'stream':  '.bin.stream',
                               'groupby': '.bin.groupby',
                               # TODO: 'connect': '.bin.connect',
@@ -50,8 +49,7 @@ TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=
                               # TODO: 'select':  '.bin.select',
                               # TODO: 'where':   '.bin.where',
                               # TODO: 'dropna':  '.bin.dropna',
-                              }.items()
-]
+                              }.items()]
 
 
 def readme_file():
@@ -59,13 +57,14 @@ def readme_file():
     with open(os.path.join(os.path.dirname(__file__), "README.md"), 'r') as readme:
         return readme.read()
 
+
 setup(
     name             = __appname__,
     version          = __version__,
     author           = __authors__,
     author_email     = __contact__,
     description      = ('Data Science Tool'),
-    license          = 'GPLv3',
+    license          = __license__,
     keywords         = 'data science tools analytics optimization',
     url              = 'https://readthedocs.com/dataphile',
     packages         = find_packages(),
@@ -77,6 +76,6 @@ setup(
                         'Programming Language :: Python :: 3.7',
                         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)', ],
     install_requires = ['numpy', 'scipy', 'matplotlib', 'seaborn', 'pandas', 'astropy', 'tqdm',
-                        'h5py',],
+                        'h5py', 'logalpha'],
     entry_points     = {'console_scripts': TOOLS},
 )
