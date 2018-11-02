@@ -1,24 +1,16 @@
-# -*- coding: utf-8 -*-
-# This file is part of the Dataphile Project.
-# Dataphile - A suite of software for data acquisition and analysis in Python.
-# Copyright (c) 2018 Geoffrey Lentner <glentner@gmail.com>
+# This file is part of the Dataphile package.
 #
-# Dataphile is free software; you can redistribute it  and/or modify it under the terms of the GNU
-# General Public License (v3.0) as published by the Free Software Foundation,  either version 3 of
-# the License, or (at your option) any  later version. WARRANTY; without even the implied warranty
-# of MERCHANTABILITY  or FITNESS  FOR A  PARTICULAR PURPOSE.  See the  GNU General  Public License
-# (v3.0) for more details.
+# This program is free software: you can redistribute it and/or modify it under the
+# terms of the Apache License (v2.0) as published by the Apache Software Foundation.
 #
-# You should have received a copy of the GNU General Public License (v3.0) along with this program.
-# If not, see <http://www.gnu.org/licenses/>.
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE. See the Apache License for more details.
+#
+# You should have received a copy of the Apache License along with this program.
+# If not, see <https://www.apache.org/licenses/LICENSE-2.0>.
 
-"""Display progress bar (using stderr) for piping data.
-   dataphile.bin.monitor
-
-   Dataphile, 0.1.5
-   Copyright (c) Geoffrey Lentner 2018. All rights reserved.
-   GNU General Public License v3. See LICENSE file.
-"""
+"""Display progress bar (using stderr) for piping data."""
 
 
 # standard libs
