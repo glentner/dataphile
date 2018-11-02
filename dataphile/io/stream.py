@@ -95,12 +95,16 @@ class BaseStream(AbstractBase):
     @sources.setter
     def sources(self, other: List[str]) -> None:
         """Validate and assign sources."""
-        for i, value in enumerate(other):
-            if not isinstance(value, str):
-                raise ValueError(f'{self.__class__.__qualname__}.sources expects List[str], '
-                                 f'given {type(value)} at position {i}.')
-        self._sources = list(other)
-        self.active = self._sources[0]
+        if len(other) < 1:
+            self._sources = list()
+            self._active = self._default_source
+        else:
+            for i, value in enumerate(other):
+                if not isinstance(value, str):
+                    raise ValueError(f'{self.__class__.__qualname__}.sources expects List[str], '
+                                     f'given {type(value)} at position {i}.')
+            self._sources = list(other)
+            self.active = self._sources[0]
 
     @property
     def active(self) -> IO:

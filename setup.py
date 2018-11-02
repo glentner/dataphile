@@ -38,6 +38,7 @@ TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=
          for name, module in {'phile':   '',  # TODO: 'main' application remains undecided
                               'stream':  '.bin.stream',
                               'groupby': '.bin.groupby',
+                              'gunzip':  '.bin.gunzip',
                               # TODO: 'connect': '.bin.connect',
                               # TODO: 'watch':   '.bin.watch',
                               # TODO: 'monitor': '.bin.monitor',
