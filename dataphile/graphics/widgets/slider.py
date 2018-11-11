@@ -16,6 +16,7 @@
 from typing import List, Tuple, Callable
 
 import matplotlib as mpl
+import matplotlib.figure
 from matplotlib import widgets
 
 class Slider:
