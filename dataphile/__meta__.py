@@ -14,7 +14,7 @@
 
 
 __appname__   = 'dataphile'
-__version__   = '0.1.6'
+__version__   = '0.1.7'
 __authors__   = 'Geoffrey Lentner'
 __contact__   = '<glentner@gmail.com>'
 __license__   = 'Apache License'
