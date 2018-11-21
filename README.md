@@ -6,7 +6,7 @@ a central repository of common tasks and capabilities used by the author, but ha
 something others might find useful. See [components](#Components) below.
 
 
-[![GitHub License](http://img.shields.io/badge/license-GPLv3-blue.svg?style=flat)](http://www.gnu.org/copyleft/gpl.html)
+[![GitHub License](http://img.shields.io/badge/license-Apache-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
 [![PyPI Version](https://img.shields.io/pypi/v/dataphile.svg)](https://pypi.org/project/dataphile/)
 [![Docs Latest](https://readthedocs.org/projects/dataphile/badge/?version=latest)](https://dataphile.readthedocs.io)
 
