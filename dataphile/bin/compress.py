@@ -19,7 +19,7 @@ import platform
 
 # internal libs
 from ..io.stream import BinaryStream
-from ..io.zlib import iterdecompress
+from ..io.compression import iterdecompress
 
 if platform.system() == 'Windows':
     # FIXME: how do we ignore broken pipes on windows?
