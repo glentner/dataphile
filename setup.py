@@ -56,7 +56,7 @@ setup(
     version          = __version__,
     author           = __authors__,
     author_email     = __contact__,
-    description      = 'Data Science Tool',
+    description      = 'Data analytics library and command line data-ops tools.',
     license          = __license__,
     keywords         = 'data science tools analytics optimization',
     url              = 'https://dataphile.readthedocs.io',
