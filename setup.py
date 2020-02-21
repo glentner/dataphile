@@ -27,10 +27,10 @@ from dataphile.__meta__ import (__appname__,
 
 CMD_PREFIX = 'data.'  # Change this to '' to remove prefix on all commands
 TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=name, module=module)
-         for name, module in {'phile':   '',  # TODO: 'main' application remains undecided
-                              'stream':  '.bin.stream',
-                              'groupby': '.bin.groupby',
-                              'gunzip':  '.bin.gunzip',
+         for name, module in {'phile':    '',  # TODO: 'main' application remains undecided
+                              'stream':   '.bin.stream',
+                              'groupby':  '.bin.groupby',
+                              'compress': '.bin.compress',
                               # TODO: 'connect': '.bin.connect',
                               # TODO: 'watch':   '.bin.watch',
                               # TODO: 'monitor': '.bin.monitor',
@@ -69,6 +69,6 @@ setup(
                         'Programming Language :: Python :: 3.7',
                         'License :: OSI Approved :: Apache Software License', ],
     install_requires = ['numpy', 'scipy', 'matplotlib', 'seaborn', 'pandas', 'astropy', 'tqdm',
-                        'h5py', 'logalpha'],
+                        'h5py', 'logalpha<2'],
     entry_points     = {'console_scripts': TOOLS},
 )

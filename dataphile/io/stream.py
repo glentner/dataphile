@@ -20,8 +20,6 @@ import time
 import functools
 import itertools
 from typing import Any, List, IO, Union, Generator, Iterable
-
-# internal libs
 from abc import ABC as AbstractBase, abstractproperty
 
 
@@ -138,7 +136,7 @@ class BaseStream(AbstractBase):
 
     def __del__(self) -> None:
         """Ensure the active IO is closed."""
-        if self.active is not self._default_source:
+        if self.active is not None and self.active is not self._default_source:
             self._active.close()
 
     def __exit__(self, *errs) -> None:
