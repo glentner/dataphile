@@ -1,0 +1,28 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+ipython = "*"
+pytest = "*"
+hypothesis = "*"
+pylint = "*"
+sphinx = "*"
+sphinx-rtd-theme = "*"
+twine = "*"
+
+[packages]
+logalpha = "<2"
+numpy = "*"
+scipy = "*"
+matplotlib = "*"
+seaborn = "*"
+pandas = "*"
+astropy = "*"
+tqdm = "*"
+h5py = "*"
+dataphile = {editable = true,path = "."}
+
+[requires]
+python_version = "3.7"
