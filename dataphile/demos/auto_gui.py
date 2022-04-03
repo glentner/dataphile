@@ -97,7 +97,7 @@ class Sinusoidal(Demo):
         self.model = CompositeModel(
             Model(uniform,
                   Parameter(value=1.0, bounds=(0, 2), label='scale'),
-                  label='background'),
+                  label='background', group='background'),
             Model(sinusoid1D,
                   Parameter(value=1.0, bounds=(0.5, 2.0), label='amplitude'),
                   Parameter(value=1.5, bounds=(1.0, 2.0), label='frequency'),
@@ -184,7 +184,7 @@ class GaussianPeaks(Demo):
                   Parameter(value=100, bounds=(0, 200),      label='scale'),
                   Parameter(value=0,   bounds=(-0.1, 0.1),   label='slope'),
                   Parameter(value=0,   bounds=(5e-5, -5e-5), label='gradient'),
-                  label='background'),
+                  label='background', group='background'),
             Model(gaussian1D,
                   Parameter(value=100, bounds=(10, 300), label='amplitude'),
                   Parameter(value=170, bounds=(100, 300), label='center'),
@@ -203,11 +203,13 @@ class GaussianPeaks(Demo):
             label='gaussian_peaks')
 
         xsample = np.linspace(0, 400, 1500)
-        model_curve, = ax_2.plot(xsample, model(xsample), color='steelblue', label='model')
+        model_curve, = ax_2.plot(xsample, model(xsample), color='steelblue', linewidth=2, label='model')
         ax_2.legend()
 
-        gui = AutoGUI(model, [model_curve], bbox=[0.20, 0.07, 0.75, 0.12],
-                      slider_options={'color': 'steelblue'}, data=(xdata_i, ydata_i))
+        gui = AutoGUI(model, [model_curve], data=(xdata_i, ydata_i),
+                      bbox=[0.20, 0.07, 0.75, 0.12], slider_options={'color': 'steelblue'},
+                      draw_subgraphs=True, subgraph_options={'color': 'red'},
+                      fit_button_options={'vertical_pad': 0.01})
 
         # assign members
         self.model = model

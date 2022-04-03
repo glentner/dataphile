@@ -12,7 +12,7 @@
 
 """Construct analytic models to optimize against data."""
 
-from typing import List, Tuple, Dict, Callable, Any, Union
+from typing import List, Tuple, Dict, Callable, Any, Union, Optional
 from numbers import Number
 import itertools
 
@@ -163,7 +163,7 @@ class Model:
     """Represents a mathematical (analytical) function with associated `Parameter`s."""
 
     def __init__(self, f: Callable, *parameters: Parameter, label: str=None,
-                 optimizer: Callable=curve_fit):
+                 optimizer: Callable=curve_fit, group: str=None):
         """Initialize attributes.
 
            Arguments
@@ -185,6 +185,7 @@ class Model:
         self.parameters = parameters
         self.label = label
         self.optimizer = optimizer
+        self.group = group
 
         for parameter in parameters:
             parameter.model = self  # associate with parent Model
@@ -330,6 +331,11 @@ class CompositeModel(Model):
         self.__index_map = list(itertools.accumulate([0] + [len(model.parameters) for model in models]))
         self.__index_pairs = [tuple(self.__index_map[i-1:i+1]) for i in range(1, len(self.__index_map))]
 
+        self.groups = {
+            group: [model for model in models if model.group == group]
+            for group in set([model.group for model in models])
+        }
+
     @property
     def models(self) -> Tuple[Model, ...]:
         """Component models."""
@@ -392,7 +398,8 @@ class AutoGUI:
     def __init__(self, model: Model, graphs: List[mpl.lines.Line2D]=None, figure: mpl.figure.Figure=None,
                  bbox: List[float]=[0, 0, 1, 1], background: Union[bool,str]=None, border: bool=False,
                  radio_options: Dict[str, Any]=None, slider_options: Dict[str, Any]=None,
-                 data: Tuple[np.ndarray, np.ndarray]=None):
+                 data: Tuple[np.ndarray, np.ndarray]=None, draw_subgraphs: bool = True,
+                 subgraph_options: Dict[str, Any] = None, fit_button_options: Dict[str, Any] = None):
         """Initialize elements of the GUI.
 
            Arguments
@@ -424,14 +431,21 @@ class AutoGUI:
         """
 
         # initialize attributes
+        self.radio_options = radio_options
+        self.slider_options = slider_options
+        self.subgraph_options = subgraph_options
+        self.fit_button_options = fit_button_options
+        self.draw_subgraphs = draw_subgraphs
+
+        # initialize structures
         self.model = model
         self.graphs = graphs
         self.figure = figure
         self.bbox = bbox
         self.border = border
         self.background = background
-        self.radio_options = radio_options
-        self.slider_options = slider_options
+
+        # initialize data
         self.data = data
 
         # access modes
@@ -486,6 +500,17 @@ class AutoGUI:
             return list(self.model.models)
 
     @property
+    def model_background(self) -> Optional[Model]:
+        """The component model with a `group='background'` if present."""
+        if not isinstance(self.model, CompositeModel):
+            return None
+        try:
+            model, = self.model.groups['background']
+            return model
+        except KeyError:
+            return None
+
+    @property
     def graphs(self) -> List[mpl.lines.Line2D]:
         """Curves to be updated when interacting with widgets."""
         return self.__graphs
@@ -500,6 +525,18 @@ class AutoGUI:
                             .format(self.__class__.__name__, val))
         else:
             self.__graphs = list(val)
+        if isinstance(self.model, CompositeModel) and self.draw_subgraphs:
+            self.__component_graphs = {}
+            for graph in self.__graphs:
+                xdata = graph.get_xdata()
+                background = 0 if self.model_background is None else self.model_background(xdata)
+                self.__component_graphs[graph] = []
+                options = {'color': 'orange', 'linewidth': 1, 'linestyle': '--'}
+                options.update(self.subgraph_options)
+                for model in self.models:
+                    ydata = background if model is self.model_background else background + model(xdata)
+                    subgraph, = graph.axes.plot(xdata, ydata, **options)
+                    self.__component_graphs[graph].append((model, subgraph))
 
     def __create_default_graphs(self) -> List[mpl.lines.Line2D]:
         """Create default graph for widget elements to manipulate."""
@@ -612,6 +649,22 @@ class AutoGUI:
             self.__slider_options = val
 
     @property
+    def subgraph_options(self) -> Dict[str, Any]:
+        """Parameters (a.k.a., "kwargs") for plotting the subgraphs (e.g., 'color')."""
+        return self.__subgraph_options
+
+    @subgraph_options.setter
+    def subgraph_options(self, val: Dict[str, Any]) -> None:
+        """Assign parameters (a.k.a., "kwargs") for plotting subgraphs."""
+        if val is None:
+            self.__subgraph_options = dict()
+        elif not isinstance(val, dict) or not all(isinstance(k, str) for k in val.keys()):
+            raise TypeError('{0}.subgraph_options expects Dict[str, Any], given {1}.'
+                            .format(self.__class__.__name__, val))
+        else:
+            self.__subgraph_options = val
+
+    @property
     def sliders(self) -> List[Slider]:
         """Currently active sliders for GUI."""
         return self.__sliders
@@ -637,11 +690,6 @@ class AutoGUI:
     def radio(self) -> mpl.widgets.RadioButtons:
         """Access to the radio buttons widget."""
         return self.__radio
-
-    @property
-    def sliders(self) -> List[Slider]:
-        """Access to list of current available sliders."""
-        return self.__sliders
 
     @property
     def data(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -687,6 +735,18 @@ class AutoGUI:
     def __radio_on_clicked(self, label: str) -> None:
         """Action to take in the event that a button is selected on the radio widget."""
         self.__create_sliders(label) # recreate the sliders for the currently selected model
+        if isinstance(self.model, CompositeModel) and self.draw_subgraphs:
+            for graph, component in self.__component_graphs.items():
+                for model, subgraph in component:
+                    if model is self.active_model:
+                        subgraph.set_linestyle('-')
+                        subgraph.set_linewidth(2)
+                        subgraph.set_zorder(100)
+                    else:
+                        subgraph.set_linestyle('--')
+                        subgraph.set_linewidth(1)
+                        subgraph.set_zorder(50)
+                graph.figure.canvas.draw_idle()
         self.figure.canvas.draw_idle()
 
     def __create_sliders(self, label: str) -> None:
@@ -732,12 +792,18 @@ class AutoGUI:
     def __update_graph(self) -> None:
         """Re-draw curves based on current slider values."""
         for graph in self.graphs:
-            graph.set_ydata(self.model(graph.get_xdata()))
+            xdata = graph.get_xdata()
+            graph.set_ydata(self.model(xdata))
+            if isinstance(self.model, CompositeModel) and self.draw_subgraphs:
+                background = 0 if self.model_background is None else self.model_background(xdata)
+                for model, subgraph in self.__component_graphs[graph]:
+                    ydata = background if model is self.model_background else background + model(xdata)
+                    subgraph.set_ydata(ydata)
             graph.figure.canvas.draw_idle()
 
     def __abs_pos(self, x: float, y: float) -> List[float]:
         """Helper function returns absolute x and/or y values (percent) given relative values."""
-        assert x >= 0 and x <= 1 and y >= 0 and y <= 1
+        assert 0 <= x <= 1 and 0 <= y <= 1
         x0, y0, width, height = self.bbox
         return (x0 + x * width, y0 + y * height)
 
@@ -750,7 +816,7 @@ class AutoGUI:
         self.__background_axis = self.figure.add_axes(self.bbox)
 
         # facecolor, ticks and grid
-        self.__background_axis.set_facecolor('white')
+        self.__background_axis.set_facecolor(self.background)
         self.__background_axis.grid(False)
         self.__background_axis.set_xticks([])
         self.__background_axis.set_yticks([])
@@ -763,10 +829,11 @@ class AutoGUI:
         """Create a button widget to calls the 'model.fit' function."""
 
         # geometry
-        width = 0.08  # of figure
-        height = 0.05  # of figure
-        x0 = self.bbox[0] + self.bbox[2] - width - 0.03
-        y0 = self.bbox[1] - height  # under the bbox
+        width = self.fit_button_options['width']
+        height = self.fit_button_options['height']
+        x0 = self.bbox[0] + self.bbox[2] - width  - self.fit_button_options['horizontal_pad']
+        y0 = self.bbox[1] - height - self.fit_button_options['vertical_pad']
+
         self.__fit_button_ax = self.figure.add_axes([x0, y0, width, height])
         self.__fit_button = widgets.Button(self.__fit_button_ax, label='Fit',
                                            color='steelblue', hovercolor='lightgray')
@@ -779,3 +846,20 @@ class AutoGUI:
         self.model.fit(*self.data)
         self.__update_graph()
         self.__create_sliders(self.active_model.label)
+
+    @property
+    def fit_button_options(self) -> Dict[str, Any]:
+        """Style properties for the fit button."""
+        return self.__fit_button_options
+
+    @fit_button_options.setter
+    def fit_button_options(self, val: Dict[str, Any]) -> None:
+        """Assign style properties for the fit button."""
+        default = {'width': 0.08, 'height': 0.05, 'horizontal_pad': 0, 'vertical_pad': 0}
+        if val is None:
+            self.__fit_button_options = default
+        elif not isinstance(val, dict) or not all(isinstance(k, str) for k in val.keys()):
+            raise TypeError('{0}.fit_button_options expects Dict[str, Any], given {1}.'
+                            .format(self.__class__.__name__, val))
+        else:
+            self.__fit_button_options = {**default, **val}
