@@ -29,7 +29,7 @@ CMD_PREFIX = 'data.'  # Change this to '' to remove prefix on all commands
 TOOLS = ['{prefix}{name}=dataphile{module}:main'.format(prefix=CMD_PREFIX, name=name, module=module)
          for name, module in {'phile':    '',  # TODO: 'main' application remains undecided
                               'stream':   '.bin.stream',
-                              'groupby':  '.bin.groupby',
+                              # 'groupby':  '.bin.groupby',  FIXME: broken
                               'compress': '.bin.compress',
                               # TODO: 'connect': '.bin.connect',
                               # TODO: 'watch':   '.bin.watch',
