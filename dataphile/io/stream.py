@@ -53,9 +53,7 @@ class BaseStream(AbstractBase):
         self.sources = sources
 
         self._active_id = 0
-        if not self.sources:
-            self._active = self._default_source
-        else:
+        if sources:
             for source in self.sources:
                 if not os.path.exists(source):
                     raise ValueError(f'{self.__class__.__qualname__}.__init__: '
@@ -86,7 +84,7 @@ class BaseStream(AbstractBase):
     def sources(self, other: List[str]) -> None:
         """Validate and assign sources."""
         if len(other) < 1:
-            self._sources = list()
+            self._sources = [self._default_source]
             self._active = self._default_source
         else:
             for i, value in enumerate(other):
@@ -149,7 +147,7 @@ class BaseStream(AbstractBase):
 
     def __str__(self) -> str:
         """String representation."""
-        sources = ', '.join(self.sources)
+        sources = ', '.join([str(f) for f in self.sources])
         options = ', '.join([f'{key}={value}' for key, value in self.options.items()])
         clsname = f'{self.__class__.__name__}'
         return f'<{clsname}({sources}, {options})>'
