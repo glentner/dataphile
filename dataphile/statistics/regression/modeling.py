@@ -288,7 +288,7 @@ class Model:
                 [ np.nan if p.bounds is None else p.bounds[1] for p in self.parameters])
 
         # run optimization against current parameter values
-        popt, pcov = self.optimizer(self.function, xdata, ydata, p0=self.values, **options)
+        popt, pcov = self.optimizer(self.function, xdata, ydata, p0=self.values, bounds=bounds, **options)
 
         # reassign parameter values and attribute variances
         self.values = popt

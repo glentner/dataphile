@@ -183,7 +183,7 @@ class GaussianPeaks(Demo):
             Model(polynomial1D,
                   Parameter(value=100, bounds=(0, 200),      label='scale'),
                   Parameter(value=0,   bounds=(-0.1, 0.1),   label='slope'),
-                  Parameter(value=0,   bounds=(5e-5, -5e-5), label='gradient'),
+                  Parameter(value=0,   bounds=(-5e-5, 5e-5), label='gradient'),
                   label='background', group='background'),
             Model(gaussian1D,
                   Parameter(value=100, bounds=(10, 300), label='amplitude'),
